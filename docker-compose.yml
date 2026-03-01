@@ -1,0 +1,194 @@
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    container_name: hourtracker-db
+    ports:
+      - "127.0.0.1:5432:5432"
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: postgres
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./scripts/migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Supabase Studio (Web UI)  
+  studio:
+    image: supabase/studio:20250109-4b5e65f
+    platform: linux/amd64
+    container_name: hourtracker-studio
+    profiles:
+      - optional
+    ports:
+      - "127.0.0.1:3010:3000"
+    environment:
+      SUPABASE_URL: http://kong:8000
+      SUPABASE_PUBLIC_URL: ${SUPABASE_PUBLIC_URL:-http://localhost:8001}
+      STUDIO_PG_META_URL: http://meta:8080
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    depends_on:
+      - kong
+
+  # Kong API Gateway
+  kong:
+    image: kong:2.8-alpine
+    platform: linux/amd64
+    container_name: hourtracker-kong
+    ports:
+      - "${KONG_HTTP_PORT:-8001}:8000"
+      - "127.0.0.1:8444:8443"
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /var/lib/kong/kong.yml
+      KONG_DNS_ORDER: LAST,A,CNAME
+      KONG_PLUGINS: request-transformer,cors,key-auth,acl,basic-auth
+      KONG_NGINX_PROXY_PROXY_BUFFER_SIZE: 160k
+      KONG_NGINX_PROXY_PROXY_BUFFERS: 64 160k
+    volumes:
+      - ./docker/kong/kong.yml:/var/lib/kong/kong.yml
+    depends_on:
+      - rest
+      - auth
+
+  # PostgREST API
+  rest:
+    image: postgrest/postgrest:v12.2.3
+    container_name: hourtracker-rest
+    ports:
+      - "127.0.0.1:3002:3000"
+    environment:
+      PGRST_DB_URI: postgres://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/postgres
+      PGRST_DB_SCHEMAS: public,storage
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${JWT_SECRET:-super-secret-jwt-token-with-at-least-32-characters-long}
+      PGRST_DB_USE_LEGACY_GUCS: "false"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # GoTrue Auth Service
+  auth:
+    image: supabase/gotrue:v2.184.0
+    platform: linux/amd64
+    container_name: hourtracker-auth
+    restart: on-failure:5
+    ports:
+      - "127.0.0.1:9999:9999"
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: 9999
+      API_EXTERNAL_URL: ${SUPABASE_PUBLIC_URL:-http://localhost:8001}
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/postgres?search_path=auth
+      GOTRUE_SITE_URL: ${SITE_URL:-http://localhost:3001}
+      GOTRUE_URI_ALLOW_LIST: ${SITE_URL:-http://localhost:3001}
+      GOTRUE_DISABLE_SIGNUP: ${DISABLE_SIGNUP:-true}
+      GOTRUE_JWT_ADMIN_ROLES: service_role
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_JWT_EXP: 3600
+      GOTRUE_JWT_SECRET: ${JWT_SECRET:-super-secret-jwt-token-with-at-least-32-characters-long}
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+      GOTRUE_MAILER_AUTOCONFIRM: "true"
+      GOTRUE_SMTP_HOST: inbucket
+      GOTRUE_SMTP_PORT: 2500
+      GOTRUE_SMTP_USER: fake@email.com
+      GOTRUE_SMTP_PASS: password
+      GOTRUE_SMTP_ADMIN_EMAIL: admin@email.com
+      GOTRUE_MAILER_URLPATHS_INVITE: /auth/v1/verify
+      GOTRUE_MAILER_URLPATHS_CONFIRMATION: /auth/v1/verify
+      GOTRUE_MAILER_URLPATHS_RECOVERY: /auth/v1/verify
+      GOTRUE_MAILER_URLPATHS_EMAIL_CHANGE: /auth/v1/verify
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Postgres Meta (for Studio)
+  meta:
+    image: supabase/postgres-meta:v0.88.0
+    platform: linux/amd64
+    container_name: hourtracker-meta
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      PG_META_PORT: 8080
+      PG_META_DB_HOST: db
+      PG_META_DB_PORT: 5432
+      PG_META_DB_NAME: postgres
+      PG_META_DB_USER: postgres
+      PG_META_DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Inbucket (Email testing)
+  inbucket:
+    image: inbucket/inbucket:stable
+    container_name: hourtracker-inbucket
+    ports:
+      - "127.0.0.1:2500:2500"
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:1100:1100"
+
+  # Next.js App
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${SUPABASE_PUBLIC_URL:-http://localhost:8001}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${ANON_KEY:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0}
+    container_name: hourtracker-app
+    ports:
+      - "${APP_PORT:-3001}:3000"
+    environment:
+      NEXT_PUBLIC_SUPABASE_URL: ${SUPABASE_PUBLIC_URL:-http://localhost:8001}
+      SUPABASE_URL: http://kong:8000
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${ANON_KEY:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0}
+    depends_on:
+      - kong
+      - auth
+      - rest
+    restart: unless-stopped
+
+  # Backup Scheduler (S3) - runs once ~30min after startup, then exits
+  # Start with: ./scripts/start-backup.sh
+  backup:
+    build:
+      context: .
+      dockerfile: Dockerfile.backup
+    container_name: hourtracker-backup
+    profiles:
+      - backup
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # AWS credentials (injected by start-backup.sh)
+      - AWS_ACCESS_KEY_ID
+      - AWS_SECRET_ACCESS_KEY
+      - AWS_SESSION_TOKEN
+      # Fallback: profile-based auth via mounted ~/.aws
+      - AWS_PROFILE=${AWS_PROFILE:-}
+      # Backup config
+      - S3_BUCKET=${S3_BUCKET:-your-backup-bucket}
+      - S3_REGION=${S3_REGION:-us-east-1}
+      - BACKUP_RETENTION_DAYS=${BACKUP_RETENTION_DAYS:-30}
+      - PGHOST=db
+      - PGUSER=postgres
+      - PGPASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - PGDATABASE=postgres
+      # Delay before backup (default: 5 minutes)
+      - STARTUP_DELAY_SECONDS=${STARTUP_DELAY_SECONDS:-300}
+    volumes:
+      - ~/.aws:/root/.aws:ro
+      - ./scripts:/scripts:ro
+    restart: "no"
+
+volumes:
+  db-data:

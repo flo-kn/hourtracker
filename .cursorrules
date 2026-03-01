@@ -1,0 +1,15 @@
+# Project Standards: Next.js + Supabase High-Performance Stack
+
+
+## 🛠 TECH-STACK SPECIFICS
+- **Next.js:** App Router, Tailwind CSS, TypeScript.
+- **Supabase:** - Migrations located in `scripts/`.
+  - Use generated TypeScript types (`Database`) exclusively.
+  - RLS policies must explicitly define `USING` and `WITH CHECK` clauses.
+- **Code Style:** Clean Code, descriptive variable names, self-documenting code over excessive comments.
+
+---
+
+## 📋 ARTIFACT TEMPLATES
+- **Migration:** `YYYYMMDDHHMMSS_description.sql`
+- **Design Note:** "Logic: [X] -> State: [Y] -> DB: [Z]"
