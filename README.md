@@ -95,13 +95,6 @@ Before deploying to production, also review:
 
 See [DOCKER_README.md](./DOCKER_README.md#production-deployment) for production deployment guidance.
 
-## Contributing
-
-Contributions are welcome! Please open an issue or submit a pull request.
-
-## License
-
-This project is licensed under the [MIT License](./LICENSE).
 
 ## TODOs
 
