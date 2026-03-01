@@ -1,0 +1,19 @@
+# Lightweight backup container with AWS CLI and PostgreSQL client
+FROM alpine:3.19
+
+# Install required packages
+RUN apk add --no-cache \
+    aws-cli \
+    postgresql16-client \
+    bash \
+    bc \
+    coreutils
+
+# Create non-root user for security
+RUN adduser -D -s /bin/bash backup
+
+# Set working directory
+WORKDIR /scripts
+
+# Default command runs the scheduler
+CMD ["/scripts/backup-scheduler.sh"]
