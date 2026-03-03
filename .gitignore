@@ -20,6 +20,9 @@ yarn-error.log*
 # env files
 .env*
 
+# generated kong config (contains secrets injected from .env)
+docker/kong/kong.yml
+
 # vercel
 .vercel
 
