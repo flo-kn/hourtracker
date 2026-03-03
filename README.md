@@ -99,3 +99,4 @@ See [DOCKER_README.md](./DOCKER_README.md#production-deployment) for production 
 ## TODOs
 
 - [ ] Quick Launch Feature as replacement for terminal `docker compose up`
+- [ ] Language Support for Timesheet Exports (Some customers want timesheets in their native languag)
