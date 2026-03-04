@@ -129,10 +129,20 @@ docker-compose logs -f app
 docker-compose up -d --build app
 ```
 
-## Backup and Recovery (S3)
+## Backup and Recovery
 
-Automated backups to AWS S3 for data durability. The backup runs once, ~30 minutes
-after you start the app, then the container exits.
+Hour Tracker stores all data in PostgreSQL. Any standard `pg_dump` of the
+`postgres` database is a complete backup. You can use whatever backup tool or
+cloud storage fits your setup.
+
+The repository ships with an **optional S3-based reference implementation** in
+`scripts/backup/`. See [`scripts/backup/README.md`](./scripts/backup/README.md)
+for the full contract and how to swap in a different strategy.
+
+### S3 Reference Implementation
+
+Automated backups to AWS S3. The backup runs once, ~5 minutes
+after you start the container, then exits.
 
 ### Prerequisites
 
@@ -147,7 +157,7 @@ after you start the app, then the container exits.
 aws sso login --profile your-aws-profile
 
 # 2. Start the backup container (extracts temp credentials from SSO session)
-./scripts/start-backup.sh
+./scripts/backup/start-backup.sh
 
 # 3. View logs
 docker-compose --profile backup logs -f backup

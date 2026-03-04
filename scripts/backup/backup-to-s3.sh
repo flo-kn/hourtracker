@@ -69,7 +69,7 @@ log_info "Creating database dump..."
 export PGPASSWORD
 
 if ! pg_dump -h "$PGHOST" -U "$PGUSER" -d "$PGDATABASE" \
-    --no-owner --no-acl \
+    --no-owner \
     --format=plain \
     | gzip > "${TEMP_DIR}/${BACKUP_FILE}"; then
     log_error "Failed to create database dump"
