@@ -3,11 +3,11 @@
 #
 # Usage:
 #   aws sso login --profile your-aws-profile
-#   ./scripts/start-backup.sh
+#   ./scripts/backup/start-backup.sh
 #
 # The script exports temporary credentials from your SSO session and passes them
 # to the backup container via environment variables. The container will wait
-# ~30 minutes, run one backup, and exit.
+# ~5 minutes (STARTUP_DELAY_SECONDS), run one backup, and exit.
 
 set -euo pipefail
 

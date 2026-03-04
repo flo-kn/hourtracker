@@ -1,6 +1,6 @@
 #!/bin/bash
 # Backup Scheduler - Single Run
-# Waits ~30 minutes after startup, runs one backup, then exits.
+# Waits ~5 minutes after startup, runs one backup, then exits.
 # Designed to capture data changes made shortly after app startup.
 
 set -euo pipefail

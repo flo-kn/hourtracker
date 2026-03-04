@@ -91,6 +91,18 @@ else
   echo "⚠  Kong template not found at ${KONG_TEMPLATE} — skipping."
 fi
 
+# ── volume warning ────────────────────────────────────────────────────────
+
+DB_VOLUME=$(docker volume ls -q 2>/dev/null | grep -E '(hourtracker|hour[._-]tracker).*db-data' || true)
+if [ -n "$DB_VOLUME" ]; then
+  echo ""
+  echo "⚠  Docker volume '${DB_VOLUME}' already exists."
+  echo "   POSTGRES_PASSWORD only takes effect on first DB init."
+  echo "   To update the password in an existing database, run:"
+  echo "     docker exec hourtracker-db psql -U postgres -c \\"
+  echo "       \"ALTER USER postgres WITH PASSWORD '${POSTGRES_PASSWORD}';\""
+fi
+
 echo ""
 echo "Done. You can now run:"
 echo "  docker-compose up -d"

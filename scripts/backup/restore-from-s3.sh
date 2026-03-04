@@ -190,7 +190,17 @@ fi
 log_info "Restore completed!"
 log_info "Restored from: ${BACKUP_NAME}"
 
-# Step 4: Show summary
+# Step 4: Re-apply role grants (pg_dump may strip these)
+log_info "Re-applying role grants..."
+psql -h "$PGHOST" -U "$PGUSER" -d "$PGDATABASE" --quiet <<'GRANTS'
+GRANT USAGE ON SCHEMA public TO anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO authenticated;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO authenticated;
+GRANT USAGE ON SCHEMA auth TO postgres, authenticated, service_role;
+GRANT SELECT ON auth.users TO postgres, authenticated, service_role;
+GRANTS
+
+# Step 5: Show summary
 log_info "Verifying restore..."
 CUSTOMER_COUNT=$(psql -h "$PGHOST" -U "$PGUSER" -d "$PGDATABASE" -t -c "SELECT COUNT(*) FROM customers;" 2>/dev/null | tr -d ' ')
 TIMESHEET_COUNT=$(psql -h "$PGHOST" -U "$PGUSER" -d "$PGDATABASE" -t -c "SELECT COUNT(*) FROM timesheets;" 2>/dev/null | tr -d ' ')
