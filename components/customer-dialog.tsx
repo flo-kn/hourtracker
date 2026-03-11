@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -27,16 +27,15 @@ interface CustomerDialogProps {
 export function CustomerDialog({ open, onOpenChange, onSave, customer, isLoading }: CustomerDialogProps) {
   const [name, setName] = useState("")
   const [bookedHours, setBookedHours] = useState("")
+  const [prevOpen, setPrevOpen] = useState(false)
 
-  useEffect(() => {
-    if (customer) {
-      setName(customer.name)
-      setBookedHours(customer.booked_hours.toString())
-    } else {
-      setName("")
-      setBookedHours("")
-    }
-  }, [customer, open])
+  if (open && !prevOpen) {
+    setName(customer?.name ?? "")
+    setBookedHours(customer?.booked_hours.toString() ?? "")
+  }
+  if (open !== prevOpen) {
+    setPrevOpen(open)
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

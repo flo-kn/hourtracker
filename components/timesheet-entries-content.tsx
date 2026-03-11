@@ -285,7 +285,7 @@ export function TimesheetEntriesContent({ customer, timesheet, initialEntries, u
         <Alert className="mb-6 border-green-200 bg-green-50 text-green-800">
           <Lock className="h-4 w-4" />
           <AlertDescription>
-            This timesheet is marked as completed and is locked for editing. Click "Reopen for Editing" to make changes.
+            This timesheet is marked as completed and is locked for editing. Click &quot;Reopen for Editing&quot; to make changes.
           </AlertDescription>
         </Alert>
       )}

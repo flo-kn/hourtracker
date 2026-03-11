@@ -4,7 +4,9 @@ import { Geist, Geist_Mono } from "next/font/google"
 import { ThemeProvider } from "@/components/theme-provider"
 import "./globals.css"
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const _geist = Geist({ subsets: ["latin"] })
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
 
 export const metadata: Metadata = {

@@ -1,4 +1,4 @@
-import type { TimeEntry, CustomerWithStats } from "./types"
+import type { CustomerWithStats } from "./types"
 
 interface HoursEntry {
   hours: number | string
