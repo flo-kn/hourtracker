@@ -156,7 +156,7 @@ services:
       - rest
     restart: unless-stopped
 
-  # Backup Scheduler (S3) - runs once ~5min after startup, then exits
+  # Backup Scheduler (S3) - runs once ~30min after startup, then exits
   # Start with: ./scripts/start-backup.sh
   backup:
     build:
