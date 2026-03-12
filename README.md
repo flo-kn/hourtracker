@@ -1,6 +1,6 @@
 # Hour Tracker
 
-![](./dashboard.png)
+![](./hour-tracker-dashboard.png)
 
 A self-hosted time tracking web application for freelancers to manage customers, timesheets, and log hours. Export timesheets as PDF for invoicing.
 
