@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.2](https://github.com/flo-kn/hourtracker/compare/v0.1.1...v0.1.2) (2026-07-21)
+
+
+### Bug Fixes
+
+* reliable timesheet saves in Docker (surface errors, 0.5h steps, node middleware) ([#8](https://github.com/flo-kn/hourtracker/issues/8)) ([6f742a6](https://github.com/flo-kn/hourtracker/commit/6f742a6524af9656103ccb05fa2f0b48ca511ae2))
+
 ## 0.1.1 (2026-03-11)
 
 
