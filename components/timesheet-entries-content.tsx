@@ -113,6 +113,20 @@ export function TimesheetEntriesContent({ customer, timesheet, initialEntries, u
   const handleSave = async () => {
     if (isLocked) return
 
+    // Validate before hitting the database so an out-of-range value produces a
+    // clear message instead of a swallowed DB error. The `hours` column has a
+    // CHECK (hours >= 0 AND hours <= 24), and the `max`/`min` input attributes
+    // alone do not prevent an out-of-range value from being submitted.
+    const invalidDay = entries.find((day) => {
+      if (!day.isDirty || day.hours === "") return false
+      const parsed = Number.parseFloat(day.hours)
+      return Number.isNaN(parsed) || parsed < 0 || parsed > 24
+    })
+    if (invalidDay) {
+      setSavedMessage(`Hours for ${invalidDay.dayOfMonth}. ${timesheet.month}. must be a number between 0 and 24`)
+      return
+    }
+
     setIsSaving(true)
     const supabase = createClient()
 
@@ -125,9 +139,10 @@ export function TimesheetEntriesContent({ customer, timesheet, initialEntries, u
 
         if (day.entry) {
           if (hours === 0 && !day.description) {
-            await supabase.from("time_entries").delete().eq("id", day.entry.id)
+            const { error } = await supabase.from("time_entries").delete().eq("id", day.entry.id)
+            if (error) throw error
           } else {
-            await supabase
+            const { error } = await supabase
               .from("time_entries")
               .update({
                 hours,
@@ -136,9 +151,10 @@ export function TimesheetEntriesContent({ customer, timesheet, initialEntries, u
                 updated_at: new Date().toISOString(),
               })
               .eq("id", day.entry.id)
+            if (error) throw error
           }
         } else if (hours > 0 || day.description) {
-          await supabase.from("time_entries").insert({
+          const { error } = await supabase.from("time_entries").insert({
             user_id: userId,
             timesheet_id: timesheet.id,
             entry_date: dateStr,
@@ -146,6 +162,7 @@ export function TimesheetEntriesContent({ customer, timesheet, initialEntries, u
             description: day.description || null,
             on_site: day.onSite,
           })
+          if (error) throw error
         }
       }
 
@@ -154,7 +171,7 @@ export function TimesheetEntriesContent({ customer, timesheet, initialEntries, u
       router.refresh()
     } catch (error) {
       console.error("Error saving entries:", error)
-      setSavedMessage("Error saving changes")
+      setSavedMessage(error instanceof Error ? `Error saving changes: ${error.message}` : "Error saving changes")
     } finally {
       setIsSaving(false)
     }
