@@ -117,13 +117,24 @@ export function TimesheetEntriesContent({ customer, timesheet, initialEntries, u
     // clear message instead of a swallowed DB error. The `hours` column has a
     // CHECK (hours >= 0 AND hours <= 24), and the `max`/`min` input attributes
     // alone do not prevent an out-of-range value from being submitted.
-    const invalidDay = entries.find((day) => {
+    const invalidRangeDay = entries.find((day) => {
       if (!day.isDirty || day.hours === "") return false
       const parsed = Number.parseFloat(day.hours)
       return Number.isNaN(parsed) || parsed < 0 || parsed > 24
     })
-    if (invalidDay) {
-      setSavedMessage(`Hours for ${invalidDay.dayOfMonth}. ${timesheet.month}. must be a number between 0 and 24`)
+    if (invalidRangeDay) {
+      setSavedMessage(`Hours for ${invalidRangeDay.dayOfMonth}. ${timesheet.month}. must be a number between 0 and 24`)
+      return
+    }
+
+    // Hours are tracked in half-hour increments only.
+    const invalidStepDay = entries.find((day) => {
+      if (!day.isDirty || day.hours === "") return false
+      const parsed = Number.parseFloat(day.hours)
+      return Math.abs(parsed * 2 - Math.round(parsed * 2)) > 1e-9
+    })
+    if (invalidStepDay) {
+      setSavedMessage(`Hours for ${invalidStepDay.dayOfMonth}. ${timesheet.month}. must be in steps of 0.5`)
       return
     }
 
@@ -375,7 +386,7 @@ export function TimesheetEntriesContent({ customer, timesheet, initialEntries, u
                     <TableCell>
                       <Input
                         type="number"
-                        step="0.25"
+                        step="0.5"
                         min="0"
                         max="24"
                         value={day.hours}
