@@ -163,12 +163,11 @@ log_info "Downloaded: ${DOWNLOAD_SIZE}"
 # Step 2: Confirm restore (if running interactively)
 if [ -t 0 ]; then
     echo ""
-    log_warn "WARNING: This will DROP and recreate the following database objects:"
-    log_warn "  - All tables in public schema"
-    log_warn "  - All data will be replaced with backup data"
+    log_warn "WARNING: This will DROP the public, auth and storage schemas and"
+    log_warn "recreate them from the backup. All current data will be replaced."
     echo ""
     read -p "Are you sure you want to continue? (yes/no): " CONFIRM
-    
+
     if [ "$CONFIRM" != "yes" ]; then
         log_info "Restore cancelled."
         exit 0
@@ -179,12 +178,29 @@ fi
 log_info "Restoring database..."
 export PGPASSWORD
 
-# Decompress and restore
-if ! gunzip -c "$LOCAL_FILE" | psql -h "$PGHOST" -U "$PGUSER" -d "$PGDATABASE" \
+# The init migrations already create these schemas on a fresh volume. Loading
+# the dump on top of them silently skips CREATE TABLE ("already exists") and
+# leaves the pre-existing FKs in place, so data loads in the wrong order and
+# schema drift (e.g. missing columns) goes unnoticed. Drop everything the dump
+# recreates first; the dump does not recreate the built-in public schema itself.
+# Running in a single transaction rolls the drop back if the load fails.
+RESTORE_LOG="${TEMP_DIR}/restore.log"
+if ! {
+    cat <<'PRELUDE'
+DROP SCHEMA IF EXISTS public CASCADE;
+DROP SCHEMA IF EXISTS auth CASCADE;
+DROP SCHEMA IF EXISTS storage CASCADE;
+CREATE SCHEMA public;
+PRELUDE
+    gunzip -c "$LOCAL_FILE"
+} | psql -h "$PGHOST" -U "$PGUSER" -d "$PGDATABASE" \
     --quiet \
-    --set ON_ERROR_STOP=off \
-    2>&1 | grep -v "^SET$" | grep -v "already exists" | head -20; then
-    log_warn "Some errors occurred during restore (this is often normal for schema conflicts)"
+    --single-transaction \
+    --set ON_ERROR_STOP=on \
+    > "$RESTORE_LOG" 2>&1; then
+    log_error "Restore failed; database left unchanged. Last output:"
+    tail -20 "$RESTORE_LOG"
+    exit 1
 fi
 
 log_info "Restore completed!"
@@ -198,6 +214,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO authentic
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO authenticated;
 GRANT USAGE ON SCHEMA auth TO postgres, authenticated, service_role;
 GRANT SELECT ON auth.users TO postgres, authenticated, service_role;
+NOTIFY pgrst, 'reload schema';
 GRANTS
 
 # Step 5: Show summary
@@ -211,3 +228,6 @@ log_info "Database summary after restore:"
 log_info "  - Customers: ${CUSTOMER_COUNT:-0}"
 log_info "  - Timesheets: ${TIMESHEET_COUNT:-0}"
 log_info "  - Time entries: ${ENTRY_COUNT:-0}"
+echo ""
+log_warn "Restart auth so it reconnects to the recreated schema (and applies any"
+log_warn "newer GoTrue migrations): docker-compose restart auth rest"
