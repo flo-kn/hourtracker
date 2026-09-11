@@ -195,6 +195,56 @@ docker-compose up -d
 docker-compose --profile backup run --rm backup /scripts/restore-from-s3.sh backup-2026-01-30-120000
 ```
 
+### Recovery Checklist
+
+Work through this in order. A restore drops the `public`, `auth` and
+`storage` schemas and replaces them with the dump, so make sure it is
+actually needed before running it.
+
+```bash
+# 1. Is it really data loss? A "Failed to fetch" on the login page usually
+#    means kong/auth/rest are down, not that the database is gone.
+docker-compose ps -a
+docker-compose up -d
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8001/auth/v1/health   # expect 200
+
+# 2. What is in the database right now?
+docker exec hourtracker-db psql -U postgres -c "
+  SELECT 'customers' AS t, COUNT(*) FROM customers
+  UNION ALL SELECT 'timesheets', COUNT(*) FROM timesheets
+  UNION ALL SELECT 'time_entries', COUNT(*) FROM time_entries
+  UNION ALL SELECT 'auth.users', COUNT(*) FROM auth.users;"
+docker exec hourtracker-db psql -U postgres -c "SELECT email, last_sign_in_at FROM auth.users;"
+
+# 3. What is in the backup? Compare before overwriting anything.
+aws sso login --profile your-aws-profile
+aws s3 ls s3://your-backup-bucket/backups/ --profile your-aws-profile --human-readable
+aws s3 cp s3://your-backup-bucket/backups/backup-YYYY-MM-DD-HHMMSS.sql.gz /tmp/ --profile your-aws-profile
+gunzip -c /tmp/backup-YYYY-MM-DD-HHMMSS.sql.gz | grep -c "^COPY "     # sanity: tables present
+gunzip -c /tmp/backup-YYYY-MM-DD-HHMMSS.sql.gz \
+  | awk '/^COPY public.time_entries /{f=1;next} f&&/^\\\.$/{f=0} f' | wc -l   # rows in time_entries
+
+# 4. Restore (only if the backup really has what the database is missing)
+eval "$(aws configure export-credentials --profile your-aws-profile --format env)"
+docker-compose stop app
+docker-compose --profile backup run --rm backup /scripts/restore-from-s3.sh
+docker-compose up -d
+docker-compose restart auth rest      # GoTrue/PostgREST must reconnect to the recreated schema
+
+# 5. Verify
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8001/auth/v1/health   # expect 200
+docker exec hourtracker-db psql -U postgres -c "SELECT email FROM auth.users;"   # log in with one of these
+```
+
+Notes:
+
+- The restore script refuses to leave a half-restored database: it runs in a
+  single transaction and rolls back on any error.
+- Backups are pruned after `BACKUP_RETENTION_DAYS`; if the bucket only holds
+  dumps from after the data went missing, a restore will not bring it back.
+- `POSTGRES_PASSWORD` in `.env` only applies on first DB init. If it was
+  changed after the volume was created, see `scripts/backup/README.md`.
+
 ### Configuration
 
 | Variable | Default | Description |
