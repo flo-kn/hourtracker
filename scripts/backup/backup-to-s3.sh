@@ -127,7 +127,7 @@ while IFS= read -r line; do
         aws s3 rm "s3://${S3_BUCKET}/backups/${FILENAME}" \
             $AWS_ARGS \
             --only-show-errors
-        ((DELETED_COUNT++))
+        DELETED_COUNT=$((DELETED_COUNT + 1))
     fi
 done < <(aws s3 ls "s3://${S3_BUCKET}/backups/" $AWS_ARGS 2>/dev/null || true)
 
