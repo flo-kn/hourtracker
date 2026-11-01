@@ -52,6 +52,14 @@ docker-compose --profile backup run --rm backup /scripts/backup-to-s3.sh
 
 ### Restore Notes
 
+- The restore drops the `public`, `auth` and `storage` schemas and recreates
+  them from the dump inside a single transaction, so a failed restore leaves
+  the database unchanged. Loading a dump on top of the schema created by the
+  init migrations does not work: `CREATE TABLE` is skipped, data is loaded in
+  the wrong order for the pre-existing foreign keys, and `auth.users` ends up
+  missing columns GoTrue expects.
+- After a restore, run `docker-compose restart auth rest` so GoTrue reconnects
+  to the recreated `auth` schema.
 - The restore script automatically re-applies role grants (`anon`,
   `authenticated`) after loading the dump. Older dumps taken with `--no-acl`
   may be missing these grants; the script handles both cases.
